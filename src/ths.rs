@@ -17,9 +17,18 @@ use crate::guest;
 static LIBRARY: OnceCell<Library> = OnceCell::new();
 static CALL_FN: OnceCell<unsafe extern "C" fn(*const c_char, *mut c_char, c_int, *const c_void) -> c_int> = OnceCell::new();
 
+
+/// 初始化参数
+#[derive(Debug, Clone, Serialize, Deserialize,Default)]
+pub struct ThsOption{
+    pub username: String,
+    pub password: String,
+    pub lib_ver: String,
+}
+
 #[derive(Debug, Clone)]
 pub struct THS {
-    ops: HashMap<String, String>,
+    ops: ThsOption,
     lib: &'static Library,
     login: bool,
     share_instance_id: i32,
@@ -92,18 +101,18 @@ impl Interval {
 }
 
 impl THS {
-    pub fn new(ops: Option<HashMap<String, String>>) -> Result<Self, THSError> {
+    pub fn new(ops: Option<ThsOption>) -> Result<Self, THSError> {
         let mut ops = ops.unwrap_or_default();
-        if !ops.contains_key("username") || !ops.contains_key("password") {
+        if ops.username.is_empty() || ops.password.is_empty() {
             let account = guest::rand_account();
-            ops.insert("username".to_string(), account.0);
-            ops.insert("password".to_string(), account.1);
+            ops.username  = account.0;
+            ops.password = account.1;
         }
 
         // let lib = Self::load_library()?;
-        let default_ver = String::new();
-        let lib_ver = ops.get("lib_ver").unwrap_or(&default_ver);
-        let lib_path = Self::get_lib_path(lib_ver)?;
+        // let default_ver = String::new();
+        let lib_ver = ops.lib_ver.clone();
+        let lib_path = Self::get_lib_path(&*lib_ver)?;
         let lib: &Library  = LIBRARY.get_or_init(|| unsafe {Library::new(lib_path).unwrap()});
 
         

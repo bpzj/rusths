@@ -1,13 +1,14 @@
-use std::collections::HashMap;
 
-use rusths::ths::{THS, Adjust, Interval};
-use chrono::Local;
+use rusths::ths::{THS, Adjust, Interval, ThsOption};
 
 fn main() {
-    // 初始化日志
 
     // 创建 THS 实例
-    let mut ths = THS::new(Some(HashMap::from([("lib_ver".to_string(), "116".to_string())]))).expect("Failed to create THS instance");
+    let mut ths = THS::new(Some(ThsOption { 
+        username: String::new(),
+        password: String::new(),
+        lib_ver: "116".parse().unwrap() 
+    })).expect("Failed to create THS instance");
 
     // 连接到服务器
     ths.connect().expect("Failed to connect to server");
