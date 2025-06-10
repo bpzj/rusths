@@ -147,7 +147,9 @@ impl THS {
     /// py 类型     python              rust      
     /// string     "text"             "\"test\""
     /// dict       {'key':'value'}    "{"key":"value"}"
-    pub fn call(&mut self, method: &str, params: Option<String>, buffer_size: usize) -> Result<Response, THSError> {
+    /// 泛型版本的 call 方法，支持返回不同类型
+    pub fn call<T>(&mut self, method: &str, params: Option<String>, buffer_size: usize) -> Result<T, THSError> 
+    where T: serde::de::DeserializeOwned {
         let input = format!(
             r#"{{"method":"{}","params":{}}}"#,
             method,
@@ -175,10 +177,10 @@ impl THS {
             match result {
                 0 => {
                     let output = CStr::from_ptr(output_ptr).to_str().map_err(|e| THSError::ApiError(format!("输出解码失败: {}", e)))?;
-                    if output.len() !=0 {
-                        serde_json::from_str(output).map_err(|e| THSError::ApiError(format!("JSON解析失败: {}", e)))
+                    if output.len() != 0 {
+                        serde_json::from_str::<T>(output).map_err(|e| THSError::ApiError(format!("JSON解析失败: {}", e)))
                     } else {
-                        Ok(serde_json::from_str("{\"errInfo\":\"\",\"payload\":{}}").unwrap())
+                        serde_json::from_str::<T>("{\"errInfo\":\"\",\"payload\":{}}").map_err(|e| THSError::ApiError(format!("JSON解析失败: {}", e)))
                     }
                 },
                 -1 => Err(THSError::ApiError(format!(
@@ -193,10 +195,15 @@ impl THS {
         }
     }
 
+    // 为了保持向后兼容性，添加一个专门返回 Response 类型的方法
+    // pub fn call_response(&mut self, method: &str, params: Option<String>, buffer_size: usize) -> Result<Response, THSError> {
+    //     self.call::<Response>(method, params, buffer_size)
+    // }
+
     pub fn connect(&mut self) -> Result<Response, THSError> {
         for attempt in 0..5 {
             let param = serde_json::to_string(&self.ops).unwrap();
-            match self.call("connect", Some(param), 10 * 1024) {
+            match self.call::<Response>("connect", Some(param), 10 * 1024) {
                 Ok(response) => {
                     if response.err_info.is_empty() {
                         self.login = true;
@@ -218,7 +225,7 @@ impl THS {
     pub fn disconnect(&mut self) -> Result<(), THSError> {
         if self.login {
             self.login = false;
-            self.call("disconnect", None, 1024)?;
+            self.call::<Response>("disconnect", None, 1024)?;
             println!("✅ 已成功断开与行情服务器的连接");
         } else {
             println!("✅ 已经断开连接");
@@ -227,7 +234,7 @@ impl THS {
     }
 
     pub fn help(&mut self, req: &str) -> Result<String, THSError> {
-        let response = self.call("help", Some(req.to_string()), 1024)?;
+        let response = self.call::<Response>("help", Some(req.to_string()), 1024)?;
         
         match response.payload.result {
             Some(serde_json::Value::String(s)) => Ok(s),
@@ -250,7 +257,7 @@ impl THS {
         let mut attempt = 0;
 
         while attempt < max_attempts {
-            match self.call(
+            match self.call::<Response>(
                 &format!("cmd.query_data.{}", service_key),
                 Some(req.clone()),
                 current_buffer_size,
@@ -324,7 +331,7 @@ impl THS {
             }
         }
 
-        let mut response = self.call("klines", Some(params.to_string()), 1024 * 1024)?;
+        let mut response = self.call::<Response>("klines", Some(params.to_string()), 1024 * 1024)?;
 
         // 处理返回数据中的时间字段
         if let Some(serde_json::Value::Array(arr)) = response.payload.result.as_mut() {
@@ -592,7 +599,7 @@ impl THS {
         let callback_box = Box::new(callback);
         let callback_ptr = Box::into_raw(callback_box) as *mut c_void;
 
-        self.call("subscribe.test", None, 1024 * 1024)
+        self.call::<Response>("subscribe.test", None, 1024 * 1024)
     }
 
     pub fn subscribe_tick<F>(&mut self, code: &str, callback: F) -> Result<Response, THSError>
@@ -602,7 +609,7 @@ impl THS {
         let callback_box = Box::new(callback);
         let callback_ptr = Box::into_raw(callback_box) as *mut c_void;
 
-        self.call(
+        self.call::<Response>(
             "subscribe.tick",
             Some(code.to_string()),
             1024 * 1024,
@@ -616,7 +623,7 @@ impl THS {
         let callback_box = Box::new(callback);
         let callback_ptr = Box::into_raw(callback_box) as *mut c_void;
 
-        self.call(
+        self.call::<Response>(
             "subscribe.l2",
             Some(code.to_string()),
             1024 * 1024,
@@ -624,7 +631,7 @@ impl THS {
     }
 
     pub fn unsubscribe(&mut self, subscribe_id: &str) -> Result<Response, THSError> {
-        self.call(
+        self.call::<Response>(
             "unsubscribe",
             Some(subscribe_id.to_string()),
             1024,
@@ -632,7 +639,7 @@ impl THS {
     }
 
     pub fn wencai_base(&mut self, condition: &str) -> Result<Response, THSError> {
-        self.call(
+        self.call::<Response>(
             "wencai_base",
             Some(condition.to_string()),
             1024 * 1024,
@@ -640,7 +647,7 @@ impl THS {
     }
 
     pub fn wencai_nlp(&mut self, condition: &str) -> Result<Response, THSError> {
-        self.call(
+        self.call::<Response>(
             "wencai_nlp",
             Some(condition.to_string()),
             1024 * 1024 * 8,
@@ -648,7 +655,7 @@ impl THS {
     }
 
     pub fn order_book_ask(&mut self, ths_code: &str) -> Result<Response, THSError> {
-        self.call(
+        self.call::<Response>(
             "order_book_ask",
             Some("\"".to_owned() + ths_code +"\""),
             1024 * 1024 * 8,
@@ -656,7 +663,7 @@ impl THS {
     }
 
     pub fn order_book_bid(&mut self, ths_code: &str) -> Result<Response, THSError> {
-        self.call(
+        self.call::<Response>(
             "order_book_bid",
             Some("\"".to_owned() + ths_code +"\""),
             1024 * 1024 * 8,
@@ -664,11 +671,11 @@ impl THS {
     }
 
     pub fn ipo_today(&mut self) -> Result<Response, THSError> {
-        self.call("ipo_today", None, 1024)
+        self.call::<Response>("ipo_today", None, 1024)
     }
 
     pub fn ipo_wait(&mut self) -> Result<Response, THSError> {
-        self.call("ipo_wait", None, 1024)
+        self.call::<Response>("ipo_wait", None, 1024)
     }
 
     pub fn history_minute_time_data(&mut self, ths_code: &str, date: &str, fields: Option<Vec<&str>>) -> Result<Response, THSError> {
