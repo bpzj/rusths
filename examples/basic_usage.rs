@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use rusths::ths::{THS, Adjust, Interval};
 use chrono::Local;
 

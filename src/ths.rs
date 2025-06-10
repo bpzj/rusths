@@ -101,7 +101,9 @@ impl THS {
         }
 
         // let lib = Self::load_library()?;
-        let lib_path = Self::get_lib_path()?;
+        let default_ver = String::new();
+        let lib_ver = ops.get("lib_ver").unwrap_or(&default_ver);
+        let lib_path = Self::get_lib_path(lib_ver)?;
         let lib: &Library  = LIBRARY.get_or_init(|| unsafe {Library::new(lib_path).unwrap()});
 
         
@@ -114,7 +116,7 @@ impl THS {
     }
 
 
-    fn get_lib_path() -> Result<PathBuf, THSError> {
+    fn get_lib_path(version:&str) -> Result<PathBuf, THSError> {
         if std::env::consts::ARCH == "aarch64" {
             return Err(THSError::UnsupportedPlatform("Apple M系列芯片暂不支持".into()));
         }
@@ -122,11 +124,11 @@ impl THS {
         let base_dir = std::env::current_dir()?;
         
         #[cfg(target_os = "linux")]
-        let lib_name = "hq.so";
+        let lib_name = format!("hq{}.so", version);
         #[cfg(target_os = "macos")]
-        let lib_name = "hq.dylib";
+        let lib_name = format!("hq{}.dylib", version);
         #[cfg(target_os = "windows")]
-        let lib_name = "hq.dll";
+        let lib_name = format!("hq{}.dll", version);
 
         let lib_path = base_dir.join("lib").join(lib_name);
         Ok(lib_path)
