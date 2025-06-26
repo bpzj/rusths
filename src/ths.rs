@@ -36,7 +36,8 @@ pub struct THS {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Response {
-    #[serde(rename(deserialize = "errInfo"))]
+    // 最新版本的dll返回为 err_info
+    // #[serde(rename(deserialize = "errInfo"))]
     pub err_info: String,
     pub payload: Payload,
 }
@@ -602,52 +603,7 @@ impl THS {
 
         self.cmd_query_data(req, "zhu", 1024 * 1024 * 2, 5)
     }
-
-    pub fn subscribe_test<F>(&mut self, callback: F) -> Result<Response, THSError>
-    where
-        F: FnMut(*const c_char) + Send + 'static,
-    {
-        let callback_box = Box::new(callback);
-        let callback_ptr = Box::into_raw(callback_box) as *mut c_void;
-
-        self.call::<Response>("subscribe.test", None, 1024 * 1024)
-    }
-
-    pub fn subscribe_tick<F>(&mut self, code: &str, callback: F) -> Result<Response, THSError>
-    where
-        F: FnMut(*const c_char) + Send + 'static,
-    {
-        let callback_box = Box::new(callback);
-        let callback_ptr = Box::into_raw(callback_box) as *mut c_void;
-
-        self.call::<Response>(
-            "subscribe.tick",
-            Some(code.to_string()),
-            1024 * 1024,
-        )
-    }
-
-    pub fn subscribe_l2<F>(&mut self, code: &str, callback: F) -> Result<Response, THSError>
-    where
-        F: FnMut(*const c_char) + Send + 'static,
-    {
-        let callback_box = Box::new(callback);
-        let callback_ptr = Box::into_raw(callback_box) as *mut c_void;
-
-        self.call::<Response>(
-            "subscribe.l2",
-            Some(code.to_string()),
-            1024 * 1024,
-        )
-    }
-
-    pub fn unsubscribe(&mut self, subscribe_id: &str) -> Result<Response, THSError> {
-        self.call::<Response>(
-            "unsubscribe",
-            Some(subscribe_id.to_string()),
-            1024,
-        )
-    }
+    
 
     pub fn wencai_base(&mut self, condition: &str) -> Result<Response, THSError> {
         self.call::<Response>(
